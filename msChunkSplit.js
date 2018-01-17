@@ -11,6 +11,7 @@
         return 64 * 1024 * 1024;
     };
 
+    // Configurable globals go here
     var SAMPLE = 1;
     var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
     var DOUBLECHECK_CHUNK_SIZE = true; // in optimized mode, if split threshold is exceeded check the actual chunk size
@@ -27,6 +28,7 @@
 
     var CHUNKS = [];
     var CHUNKS_TO_SPLIT = [];
+
     // Loop through the sharded collections and compose a list of arguments for the "datasize" command
     // in order to calculate the chunk sizes
 
@@ -187,7 +189,9 @@
     // Step 3: Split the qualifying chunks
 
     CHUNKS_TO_SPLIT.forEach(function(c) {
-        var shardVersion = getShardVersion(c);
-        splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
+        if(c.canSplit == true) {
+            var shardVersion = getShardVersion(c);
+            splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
+        };
     });
 });
