@@ -14,7 +14,7 @@
     // Configurable globals go here
     var SAMPLE = 1;
     var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
-    var DOUBLECHECK_CHUNK_SIZE = true; // in optimized mode, if split threshold is exceeded check the actual chunk size
+    var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
     var CONFIGSVR = db.serverStatus().sharding.configsvrConnectionString;
     var MAX_CHUNK_SIZE = getChunkSize();
     var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.2;
@@ -47,6 +47,7 @@
                     "keyPattern": d.key,
                     "min": doc.min,
                     "max": doc.max,
+                    "estimate": OPTIMIZE_CHUNK_SIZE_CALCULATION,
                     "shard": doc.shard
                 };
                 CHUNKS.push(newDoc);
@@ -56,34 +57,24 @@
 
     // Calculate the maximum chunk size and check if the split threshold is exceeded
 
-    var checkChunkSize = function(chunk) {
-        var chunkSize;
-        if (OPTIMIZE_CHUNK_SIZE_CALCULATION = true) {
-            var avgDocSize = getAvgDocSize(CON_MAP.get(chunk.shard), getDbFromNs(chunk.datasize), getColFromNs(chunk.datasize));
-            var count = countChunkDocs(
-                CON_MAP.get(chunk.shard),
-                getDbFromNs(chunk.datasize), 
-                getColFromNs(chunk.datasize), 
-                chunk.keyPattern, 
-                chunk.min, 
-                chunk.max );
-            
-            chunkSize = avgDocSize * count;
-            if (DOUBLECHECK_CHUNK_SIZE == true) {
-                if (chunkSize > SPLIT_THRESHOLD) {
-                    chunkSize = db.getSiblingDB("admin").runCommand(chunk).size;
-                };
-            };        
-        }
-        else {
-            chunkSize = db.getSiblingDB("admin").runCommand(chunk).size;            
-        };
-             
+    var checkChunkSize2 = function(chunk) {
+        var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
+        assert(res.size, "The size field is not present it the response");
+        var chunkSize = res.size;
+
         if (chunkSize > SPLIT_THRESHOLD) {
+            if( (OPTIMIZE_CHUNK_SIZE_CALCULATION == true) && (DOUBLECHECK_CHUNK_SIZE == true) ) {
+                chunk.estimate = false;
+                var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
+                assert(res.size, "The size field is not present it the response");
+                if (chunkSize > SPLIT_THRESHOLD) {
+                    var chunkSize = res.size;
+                }
+                else chunkSize = -1;
+            };
             return chunkSize;
         }
-        else 
-            return -1;
+        else return -1;
     };
 
     // Obtain the split vector
@@ -160,16 +151,6 @@
         print("Identified " + counter + " chunks that can be split");
     };
 
-    // Obtain the average doc size for the namespace from the shard
-    var getAvgDocSize = function(shardConnection, db, collection) {
-        return shardConnection.getDB(db).getCollection(collection).stats().avgObjSize;
-    };
-
-    // Count documents on the shard in the given chunk range
-    var countChunkDocs = function(shardConnection, db, collection, shardKey, min, max) {
-        return shardConnection.getDB(db).getCollection(collection).find({}).hint(shardKey).min(min).max(max)._addSpecial("$returnKey", true).count();
-    };
-
     /// MAIN SECTION
 
     // Step 1: Get the sample chunks
@@ -177,7 +158,7 @@
     getChunkCounts(CHUNKS);
     // Step 2: Filter out the qualifying chunks
     CHUNKS.forEach(function(c){ 
-        var chunkSize = checkChunkSize(c);
+        var chunkSize = checkChunkSize2(c);
         if(chunkSize >= 0) {
             var chunkToSplit = c;
             chunkToSplit.chunkSize = chunkSize;
