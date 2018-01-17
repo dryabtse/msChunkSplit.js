@@ -22,8 +22,14 @@
     var CON_MAP = new Map();
     // Sample usage CON_MAP.get("sh_0").getDB("test").s.find()
     // Modify the following statement as appropriate to add auth credentials
+    var AUTH_DB = "admin";
+    var AUTH_CRED = { user: "admin", pwd: "123" };
+
     db.getSiblingDB("config").shards.find({}).forEach(function(d) {
-        CON_MAP.put(d._id, new Mongo(d.host));
+        var con = new Mongo(d.host);
+        var res = con.getDB(AUTH_DB).auth(AUTH_CRED);
+        assert.eq(1, res, "Authentication failed");
+        CON_MAP.put(d._id, con);
     });
 
     var CHUNKS = [];
