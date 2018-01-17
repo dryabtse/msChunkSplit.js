@@ -1,4 +1,6 @@
-(function() {
+(function(NS) {
+
+    // Get the maxumum chunk size configured for the cluster
     var getChunkSize = function() {
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
             var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
@@ -135,6 +137,8 @@
     };
 
     var getChunkCounts = function(chunkArray) {
+        assert.lt(0, chunkArray.length, "no chunks found" );
+        assert(chunkArray[0].datasize, "datasize field is not present");
         print("Identified " + chunkArray.length + " chunks for " + chunkArray[0].datasize + " collection");
     };
 
@@ -161,7 +165,7 @@
     /// MAIN SECTION
 
     // Step 1: Get the sample chunks
-    getDatasizeArgs("test.s");
+    getDatasizeArgs(NS);
     getChunkCounts(CHUNKS);
     // Step 2: Filter out the qualifying chunks
     CHUNKS.forEach(function(c){ 
