@@ -5,7 +5,7 @@
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
             var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
             assert(res.value, "value field is not present");
-            assert.lt(0, res.value, "maximum chunksize value is 0");
+            assert.lte(0, res.value, "maximum chunksize value is less than or equal to 0");
             return res.value * 1024 * 1024; 
         }
         return 64 * 1024 * 1024;
@@ -40,7 +40,11 @@
 
     var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
         db.getSiblingDB("config").collections.find({_id: namespace}, {_id:1, key:1}).forEach(function(d) {
+            var count = db.getSiblingDB("config").chunks.count({ ns: d._id });
+            assert.lt(0, count, "The number of chunks to process is less than 1");
             var sampleValue = (db.getSiblingDB("config").chunks.count({ ns: d._id }) * percentage);
+            if(sampleValue < 1)
+                sampleValue = 1;
             db.getSiblingDB("config").chunks.aggregate([ {"$match": { ns: d._id }}, { $sample: { size: sampleValue } } ]).forEach(function(doc) {
                 var newDoc = {
                     "datasize": doc.ns,
