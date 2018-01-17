@@ -1,7 +1,10 @@
 (function() {
     var getChunkSize = function() {
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
-            return db.getSiblingDB("config").settings({_id: "chunksize"}, {_id:0, value:1}).value * 1024 * 1024;
+            var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
+            assert(res.value, "value field is not present");
+            assert.lt(0, res.value, "maximum chunksize value is 0");
+            return res.value * 1024 * 1024; 
         }
         return 64 * 1024 * 1024;
     };
