@@ -258,27 +258,3 @@
 
     return;
 });
-
-/*
-
-    var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
-        db.getSiblingDB("config").collections.find({_id: namespace}, {_id:1, key:1}).forEach(function(d) {
-            var count = db.getSiblingDB("config").chunks.count({ ns: d._id });
-            assert.lt(0, count, "The number of chunks to process is less than 1");
-            var sampleValue = (db.getSiblingDB("config").chunks.count({ ns: d._id }) * percentage);
-            if(sampleValue < 1)
-                sampleValue = 1;
-            db.getSiblingDB("config").chunks.aggregate([ {"$match": { ns: d._id }}, { $sample: { size: sampleValue } } ]).forEach(function(doc) {
-                var newDoc = {
-                    "datasize": doc.ns,
-                    "keyPattern": d.key,
-                    "min": doc.min,
-                    "max": doc.max,
-                    "estimate": OPTIMIZE_CHUNK_SIZE_CALCULATION,
-                    "shard": doc.shard
-                };
-                CHUNKS.push(newDoc);
-            });
-        });
-    };
-    */
