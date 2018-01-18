@@ -1,3 +1,18 @@
+// The purpose of this function is to
+// - identify all of the chunks for the given namespace
+// - calculate chunk sizes for all of the given namespace 
+//     - there are three different modes of chunk size calculation
+//        1) OPTIMIZE_CHUNK_SIZE_CALCULATION = false - in that case all of the chunk documents are read (slow, but accurate)
+//        2) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = true - chunk size calculation is performed 
+//           with the average document size. However for each chunk that exceeds the threshold we calculate the true 
+//           size (should genarally be faster than (1), but still reasonably accurate)
+//        3) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = false - similar to (2), except that we don't
+//           calculate the true size for the qualifying chunks (the fastest and least accurate option)
+//
+// Arguments:
+//   NS - String, namespace for the sharded collection in the "database.collection" format
+//   DO_SPLIT - Boolean, if set to false (default) all of the calculations will be performed except the actual chunk splits
+//
 // Prerquisites:
 //   - if authentication is enabled, the user running the script must have `internal` action granted for the `cluster` resource on the shards
 //      db.createRole({role:"splitchunk", privileges:[{resource:{cluster:true}, actions:["internal"]}], roles:[]});
@@ -24,17 +39,18 @@
         return res.sharding.configsvrConnectionString;
     };
 
+    var CONFIGSVR = getCsrsUri(); // URI for config servers; DO NOT MODIFY
+    var MAX_CHUNK_SIZE = getChunkSize(); // Maximum chunk size configured: DO NOT MODIFY
+
     // Configurable globals go here
     var SAMPLE = 1; // Defines a portion of chunks to process - 1 == 100%
     var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
     var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
-    var CONFIGSVR = getCsrsUri();
-    var MAX_CHUNK_SIZE = getChunkSize();
-    var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.2;
+    var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.9; // Split threshold
 
     var CON_MAP = new Map();
     // Sample usage CON_MAP.get("sh_0").getDB("test").s.find()
-    // Modify the following statement as appropriate to add auth credentials
+    // Modify the following statement as appropriate to add authentication credentials
     var AUTH_DB = "admin";
     var AUTH_CRED = { user: "admin", pwd: "123" };
 
@@ -108,10 +124,13 @@
             "max": chunk.max,
             "maxChunkSizeBytes": MAX_CHUNK_SIZE
         };
-        var splitVector = CON_MAP.get(chunk.shard).getDB("admin").runCommand(arguments).splitKeys;
-        if (splitVector.length > 0) {
+
+        var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(arguments);
+        assert(res.splitKeys, "The splitKey field is not present");
+
+        if (res.splitVector.length > 0) {
             chunk.canSplit = true;
-            chunk.splitVector = splitVector;
+            chunk.splitVector = res.splitVector;
         };
     };
 
@@ -127,6 +146,9 @@
                 "lastmod": 1,
                 "lastmodEpoch": 1
             });
+        assert(epoch.lastmod, "The lastmod field is not present");
+        assert(epoch.lastmodEpoch, "The lastmodEpoch field is not present");
+
         return [ epoch.lastmod, epoch.lastmodEpoch ];
     };
 
@@ -145,7 +167,7 @@
         };
   
         var res = shardConnection.getDB("admin").runCommand(args);
-        assert(res.ok, "The `ok` field is not present");
+        assert(res.ok, "The ok field is not present");
 
         if(res.ok != 1){
             print("\nERROR: Chunk split failed");
