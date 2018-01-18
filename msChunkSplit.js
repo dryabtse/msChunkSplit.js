@@ -128,9 +128,9 @@
         var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(arguments);
         assert(res.splitKeys, "The splitKey field is not present");
 
-        if (res.splitVector.length > 0) {
+        if (res.splitKeys.length > 0) {
             chunk.canSplit = true;
-            chunk.splitVector = res.splitVector;
+            chunk.splitVector = res.splitKeys;
         };
     };
 
@@ -223,7 +223,7 @@
     /// MAIN SECTION
 
     // Step 1: Get the sample chunks
-    print("Step 1: Looking for chunks for the " + NS + " collection..." );
+    print("\nStep 1: Looking for chunks for the " + NS + " collection..." );
     getDatasizeArgs2(NS);
     getChunkCounts(CHUNKS);
 
