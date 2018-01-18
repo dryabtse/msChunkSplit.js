@@ -1,4 +1,8 @@
-// The purpose of this function is to
+// ===============
+// msChunkSplit.js 
+// ===============
+//
+// The purpose of this script is to:
 // - identify all of the chunks for the given namespace
 // - calculate chunk sizes for all of the given namespace 
 //     - there are three different modes of chunk size calculation
@@ -8,6 +12,9 @@
 //           size (should genarally be faster than (1), but still reasonably accurate)
 //        3) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = false - similar to (2), except that we don't
 //           calculate the true size for the qualifying chunks (the fastest and least accurate option)
+// - for qualifying chunks (those which size is equal or exceeds SPLIT_THRESHOLD) split points are calculated
+// - for those chunks that have one or more split point, splits will be executed
+// - lastly the script will count the number of chunks for the collection again - to show if the result of splits
 //
 // Arguments:
 //   NS - String, namespace for the sharded collection in the "database.collection" format
@@ -18,8 +25,12 @@
 //      db.createRole({role:"splitchunk", privileges:[{resource:{cluster:true}, actions:["internal"]}], roles:[]});
 //      db.grantRolesToUser("admin", ["splitchunk"]);
 //   - tested with `root` & `splitchunk` roles thus `root` role is recommended
+//
+// Sample usage:
+//   splitCollectionChunks("test.s3", false);
+//   splitCollectionChunks("test.s5", true);
 
-(function(NS, DO_SPLIT=false) {
+var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     // Get the maxumum chunk size configured for the cluster
     var getChunkSize = function() {
@@ -67,7 +78,7 @@
     // Loop through the sharded collections and compose a list of arguments for the "datasize" command
     // in order to calculate the chunk sizes
 
-    var getDatasizeArgs2 = function(namespace, percentage=SAMPLE) {
+    var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
         var nsDoc = db.getSiblingDB("config").collections.findOne({_id: namespace}, {_id:1, key:1});
         assert(nsDoc._id, "The _id field is not present");
         assert(nsDoc.key, "The key field is not present");
@@ -94,7 +105,7 @@
 
     // Calculate the maximum chunk size and check if the split threshold is exceeded
 
-    var checkChunkSize2 = function(chunk) {
+    var checkChunkSize = function(chunk) {
         var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
         assert(res.size, "The size field is not present it the response");
         var chunkSize = res.size;
@@ -136,21 +147,15 @@
 
     // Get shard version for a chunk
 
-    var getShardVersion = function(chunk) {
-        var epoch = db.getSiblingDB("config").chunks.findOne({
-            "ns": chunk.datasize,
-            "min": chunk.min,
-            "max": chunk.max
-            }, {
-                "_id": 0,
-                "lastmod": 1,
-                "lastmodEpoch": 1
-            });
-        assert(epoch.lastmod, "The lastmod field is not present");
-        assert(epoch.lastmodEpoch, "The lastmodEpoch field is not present");
+    var getShardVersion = function(namespace) {
+        var res = db.getSiblingDB("admin").runCommand({getShardVersion: namespace});
+        assert(res.ok, "The ok field is not present");
+        assert(res.version, "The version field is not present");
+        assert(res.versionEpoch, "The versionEpoch field is not present");
+        assert.eq(1, res.ok, "Failed to obtain the shard version");
 
-        return [ epoch.lastmod, epoch.lastmodEpoch ];
-    };
+        return [ res.version, res.versionEpoch ];
+    }
 
     // Split a chunk
 
@@ -224,14 +229,14 @@
 
     // Step 1: Get the sample chunks
     print("\nStep 1: Looking for chunks for the " + NS + " collection..." );
-    getDatasizeArgs2(NS);
+    getDatasizeArgs(NS);
     getChunkCounts(CHUNKS);
 
 
     // Step 2: Filter out the qualifying chunks
     print("Step 2: Filtering out potential split candidates...");
     CHUNKS.forEach(function(c){ 
-        var chunkSize = checkChunkSize2(c);
+        var chunkSize = checkChunkSize(c);
         if(chunkSize > 0) {
             var chunkToSplit = c;
             chunkToSplit.chunkSize = chunkSize;
@@ -261,7 +266,8 @@
                 print("Step 4: Splitting the qualifying chunks...");
                 CHUNKS_TO_SPLIT.forEach(function(c) {
                     if(c.canSplit == true) {
-                        var shardVersion = getShardVersion(c);
+                        // var shardVersion = getShardVersion(c);
+                        var shardVersion = getShardVersion(c.datasize);
                         splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
                     };
                 });
@@ -269,7 +275,7 @@
                 // Step 5: Let's validate the splits outcome
                 print("\nStep 5: Checking if the number of chunks has changed...");
                 CHUNKS = [];
-                getDatasizeArgs2(NS);
+                getDatasizeArgs(NS);
                 getChunkCounts(CHUNKS);
             }
             else {
@@ -279,4 +285,4 @@
     };
 
     return;
-});
+};
