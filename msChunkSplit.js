@@ -60,7 +60,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.9; // Split threshold
 
     var CON_MAP = new Map();
-    // Sample usage CON_MAP.get("sh_0").getDB("test").s.find()
+
     // Modify the following statement as appropriate to add authentication credentials
     var AUTH_DB = "admin";
     var AUTH_CRED = { user: "admin", pwd: "123" };
@@ -110,7 +110,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         assert(res.size, "The size field is not present it the response");
         var chunkSize = res.size;
 
-        if (chunkSize > SPLIT_THRESHOLD) {
+        if (chunkSize >= SPLIT_THRESHOLD) {
             if( (OPTIMIZE_CHUNK_SIZE_CALCULATION == true) && (DOUBLECHECK_CHUNK_SIZE == true) ) {
                 chunk.estimate = false;
                 var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
