@@ -27,6 +27,7 @@
 //      db.createRole({role:"splitchunk", privileges:[{resource:{cluster:true}, actions:["internal"]}], roles:[]});
 //      db.grantRolesToUser("admin", ["splitchunk"]);
 //   - tested with `root` & `splitchunk` roles thus `root` role is recommended
+//   - the script tested on v3.4 _only_. Use it with MongoDB v3.6 on your own risk
 //
 // Sample usage:
 //   splitCollectionChunks("test.s3", false);
