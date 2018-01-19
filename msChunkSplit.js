@@ -14,7 +14,7 @@
 //             calculate the true size for the qualifying chunks (the fastest and least accurate option)
 //   - for qualifying chunks (those which size is equal or exceeds SPLIT_THRESHOLD) split points are calculated
 //   - for those chunks that have one or more split point, splits will be executed
-//   - lastly the script will count the number of chunks for the collection again - to show if the result of splits
+//   - lastly the script will count the number of chunks for the collection again - to show the result of splits
 //
 // Arguments:
 //   NS - String, namespace for the sharded collection in the "database.collection" format
@@ -203,6 +203,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         assert.lt(0, chunkArray.length, "no chunks found" );
         assert(chunkArray[0].datasize, "datasize field is not present");
         print("Found " + chunkArray.length + " chunks for " + chunkArray[0].datasize + " collection\n");
+
+        return chunkArray.length;
     };
 
     var getSplitChunkCounts = function(chunkArray) {
@@ -229,7 +231,37 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         print("Identified " + counter + " chunks that are candidates for splitting\n");
 
         return counter;
-    }
+    };
+
+    var printProgress = function(total, curPos, lastPosPrinted) {
+        var numBucketsTotal = 20;
+        var bucketString = "";
+        var progressString = "";
+        for(var i = 0; i < 100/numBucketsTotal; i++) {
+            bucketString = bucketString + "#";
+            progressString = progressString + "-";
+        };
+        var bucketSize = total/numBucketsTotal;
+        var numBuckets = curPos/bucketSize;
+        
+        var delta = curPos - lastPosPrinted;
+        
+        if ((delta >= bucketSize) || (curPos == 0)) {
+            var outLine = "[";
+            for(var i = 1; i <= numBucketsTotal; i++) {
+                if(i <= numBuckets) {
+                    outLine = outLine + bucketString;
+                }
+                else
+                    outLine = outLine + progressString;
+            };
+          outLine = outLine + "]" + " ... " + parseInt(numBuckets/numBucketsTotal*100) + "%";
+          print(outLine);
+          return curPos;
+        };
+        
+        return lastPosPrinted;
+      };
 
     /// MAIN SECTION
 
@@ -237,12 +269,14 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     print("\nStep 1: Looking for chunks for the " + NS + " collection..." );
     getDatasizeArgs(NS);
-    getChunkCounts(CHUNKS);
+    var wasChunks = getChunkCounts(CHUNKS);
 
 
     // Step 2: Filter out the qualifying chunks
 
     print("Step 2: Filtering out potential split candidates...");
+    var pos = 0;
+    var i = 0;
     CHUNKS.forEach(function(c){ 
         var chunkSize = checkChunkSize(c);
         if(chunkSize > 0) {
@@ -251,6 +285,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
             chunkToSplit.canSplit = false;
             CHUNKS_TO_SPLIT.push(chunkToSplit);      
         };
+        pos = printProgress(CHUNKS.length, i, pos);
+        i++;
     });
     
     var couldSplitCount = getCouldSplitChunkCounts(CHUNKS_TO_SPLIT);
@@ -262,8 +298,12 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         // Step 3: Obtain split points
 
         print("Step 3: Looking for split points for the candidate chunks...");
+        var pos = 0;
+        var i = 0;
         CHUNKS_TO_SPLIT.forEach(function(c) {
             getSplitVector(c);
+            pos = printProgress(couldSplitCount, i, pos);
+            i++;
         });
 
         var canSplitCount = getSplitChunkCounts(CHUNKS_TO_SPLIT);
@@ -276,11 +316,15 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
             if (DO_SPLIT == true) {
                 print("Step 4: Splitting the qualifying chunks...");
+                var pos = 0;
+                var i = 0;
                 CHUNKS_TO_SPLIT.forEach(function(c) {
                     if(c.canSplit == true) {
                         var shardVersion = getShardVersion(c.datasize);
                         splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
                     };
+                    pos = printProgress(canSplitCount, i, pos);
+                    i++;
                 });
 
                 // Step 5: Let's validate the splits outcome
@@ -288,7 +332,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
                 print("\nStep 5: Checking if the number of chunks has changed...");
                 CHUNKS = [];
                 getDatasizeArgs(NS);
-                getChunkCounts(CHUNKS);
+                var nowChunks = getChunkCounts(CHUNKS);
+                print("There were " + (nowChunks - wasChunks) + " chunks added");
             }
             else {
                 print("Splits were not requested. Exiting...");
