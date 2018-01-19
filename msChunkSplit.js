@@ -21,6 +21,8 @@
 //   DO_SPLIT - Boolean, if set to false (default) all of the calculations will be performed except the actual chunk splits
 //
 // Prerquisites:
+//   - it is expected that there are no writes happenning to the target namespace when the script is executed
+//   - the Balancer should be stopped and disabled
 //   - if authentication is enabled, the user running the script must have `internal` action granted for the `cluster` resource on the shards
 //      db.createRole({role:"splitchunk", privileges:[{resource:{cluster:true}, actions:["internal"]}], roles:[]});
 //      db.grantRolesToUser("admin", ["splitchunk"]);
