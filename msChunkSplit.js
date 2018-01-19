@@ -35,6 +35,7 @@
 var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     // Get the maxumum chunk size configured for the cluster
+
     var getChunkSize = function() {
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
             var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
@@ -46,6 +47,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     };
     
     // Get the CSRS connection string
+
     var getCsrsUri = function() {
         var res = db.serverStatus()
         assert(res.sharding.configsvrConnectionString, "sharding.configsvrConnectionString field is not present");
@@ -56,6 +58,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var MAX_CHUNK_SIZE = getChunkSize(); // Maximum chunk size configured: DO NOT MODIFY
 
     // Configurable globals go here
+
     var SAMPLE = 1; // Defines a portion of chunks to process - 1 == 100%
     var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
     var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
@@ -64,6 +67,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var CON_MAP = new Map();
 
     // Modify the following statement as appropriate to add authentication credentials
+
     var AUTH_DB = "admin";
     var AUTH_CRED = { user: "admin", pwd: "123" };
 
@@ -90,7 +94,6 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
         var sampleValue = count * percentage;
         if(sampleValue < 1) sampleValue = 1;
-
 
         db.getSiblingDB("config").chunks.aggregate([ {"$match": { ns: nsDoc._id }}, { $sample: { size: sampleValue } } ]).forEach(function(doc) {
             var newDoc = {
@@ -185,6 +188,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     };
 
     // A few small helpers
+
     var getDbFromNs = function(namespace) {
         return namespace.split(".")[0];
     };
@@ -230,12 +234,14 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     /// MAIN SECTION
 
     // Step 1: Get the sample chunks
+
     print("\nStep 1: Looking for chunks for the " + NS + " collection..." );
     getDatasizeArgs(NS);
     getChunkCounts(CHUNKS);
 
 
     // Step 2: Filter out the qualifying chunks
+
     print("Step 2: Filtering out potential split candidates...");
     CHUNKS.forEach(function(c){ 
         var chunkSize = checkChunkSize(c);
@@ -252,7 +258,9 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         print("There are no chunks to split. Aborting ...");
     }
     else {
+
         // Step 3: Obtain split points
+
         print("Step 3: Looking for split points for the candidate chunks...");
         CHUNKS_TO_SPLIT.forEach(function(c) {
             getSplitVector(c);
@@ -263,18 +271,20 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
             print("There are no chunks to split. Aborting ...");
         }
         else {
+
             // Step 4: Split the qualifying chunks
+
             if (DO_SPLIT == true) {
                 print("Step 4: Splitting the qualifying chunks...");
                 CHUNKS_TO_SPLIT.forEach(function(c) {
                     if(c.canSplit == true) {
-                        // var shardVersion = getShardVersion(c);
                         var shardVersion = getShardVersion(c.datasize);
                         splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
                     };
                 });
 
                 // Step 5: Let's validate the splits outcome
+
                 print("\nStep 5: Checking if the number of chunks has changed...");
                 CHUNKS = [];
                 getDatasizeArgs(NS);
