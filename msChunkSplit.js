@@ -3,18 +3,18 @@
 // ===============
 //
 // The purpose of this script is to:
-// - identify all of the chunks for the given namespace
-// - calculate chunk sizes for all of the given namespace 
-//     - there are three different modes of chunk size calculation
-//        1) OPTIMIZE_CHUNK_SIZE_CALCULATION = false - in that case all of the chunk documents are read (slow, but accurate)
-//        2) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = true - chunk size calculation is performed 
-//           with the average document size. However for each chunk that exceeds the threshold we calculate the true 
-//           size (should genarally be faster than (1), but still reasonably accurate)
-//        3) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = false - similar to (2), except that we don't
-//           calculate the true size for the qualifying chunks (the fastest and least accurate option)
-// - for qualifying chunks (those which size is equal or exceeds SPLIT_THRESHOLD) split points are calculated
-// - for those chunks that have one or more split point, splits will be executed
-// - lastly the script will count the number of chunks for the collection again - to show if the result of splits
+//   - identify all of the chunks for the given namespace
+//   - calculate chunk sizes for all of the given namespace 
+//       - there are three different modes of chunk size calculation
+//          1) OPTIMIZE_CHUNK_SIZE_CALCULATION = false - in that case all of the chunk documents are read (slow, but accurate)
+//          2) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = true - chunk size calculation is performed 
+//             with the average document size. However for each chunk that exceeds the threshold we calculate the true 
+//             size (should genarally be faster than (1), but still reasonably accurate)
+//          3) OPTIMIZE_CHUNK_SIZE_CALCULATION = true and DOUBLECHECK_CHUNK_SIZE = false - similar to (2), except that we don't
+//             calculate the true size for the qualifying chunks (the fastest and least accurate option)
+//   - for qualifying chunks (those which size is equal or exceeds SPLIT_THRESHOLD) split points are calculated
+//   - for those chunks that have one or more split point, splits will be executed
+//   - lastly the script will count the number of chunks for the collection again - to show if the result of splits
 //
 // Arguments:
 //   NS - String, namespace for the sharded collection in the "database.collection" format
