@@ -35,6 +35,20 @@
 
 var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
+    // Configurable globals start here
+
+    var SAMPLE = 1; // Defines a portion of chunks to process - 1 == 100%
+    var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
+    var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
+    var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.9; // Split threshold
+
+    // Modify the following statement as appropriate to add authentication credentials
+
+    var AUTH_DB = "admin";
+    var AUTH_CRED = { user: "admin", pwd: "123" };
+    
+    // Configurable globals end here
+
     // Get the maxumum chunk size configured for the cluster
 
     var getChunkSize = function() {
@@ -58,19 +72,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var CONFIGSVR = getCsrsUri(); // URI for config servers; DO NOT MODIFY
     var MAX_CHUNK_SIZE = getChunkSize(); // Maximum chunk size configured: DO NOT MODIFY
 
-    // Configurable globals go here
-
-    var SAMPLE = 1; // Defines a portion of chunks to process - 1 == 100%
-    var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
-    var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
-    var SPLIT_THRESHOLD = MAX_CHUNK_SIZE * 0.9; // Split threshold
-
-    var CON_MAP = new Map();
-
-    // Modify the following statement as appropriate to add authentication credentials
-
-    var AUTH_DB = "admin";
-    var AUTH_CRED = { user: "admin", pwd: "123" };
+    var CON_MAP = new Map();    
 
     db.getSiblingDB("config").shards.find({}).forEach(function(d) {
         var con = new Mongo(d.host);
