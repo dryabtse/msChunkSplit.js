@@ -40,7 +40,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var SAMPLE = 1; // Defines a portion of chunks to process - 1 == 100%
     var OPTIMIZE_CHUNK_SIZE_CALCULATION = true; // use avg doc size to calculate chunk sizes
     var DOUBLECHECK_CHUNK_SIZE = false; // in optimized mode, if split threshold is exceeded check the actual chunk size
-    var SPLIT_THRESHOLD_RATIO = 0.9; // Split threshold
+    var SPLIT_THRESHOLD_RATIO = 0.9; // Split threshold based on the maximum chunk size
 
     // Modify the following statement as appropriate to add authentication credentials
 
