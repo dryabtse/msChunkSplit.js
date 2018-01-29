@@ -54,7 +54,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var getChunkSize = function() {
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
             var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
-            assert(res.value, "value field is not present");
+            assert(res.hasOwnProperty("value"), "value field is not present");
             assert.lte(0, res.value, "maximum chunksize value is less than or equal to 0");
             return res.value * 1024 * 1024; 
         }
@@ -65,7 +65,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getCsrsUri = function() {
         var res = db.serverStatus()
-        assert(res.sharding.configsvrConnectionString, "sharding.configsvrConnectionString field is not present");
+        assert(res.hasOwnProperty("sharding"), "The sharding field is not present");
+        assert(res.sharding("configsvrConnectionString"), "The sharding.configsvrConnectionString field is not present");
         return res.sharding.configsvrConnectionString;
     };
 
@@ -90,8 +91,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
         var nsDoc = db.getSiblingDB("config").collections.findOne({_id: namespace}, {_id:1, key:1});
-        assert(nsDoc._id, "The _id field is not present");
-        assert(nsDoc.key, "The key field is not present");
+        assert(nsDoc.hasOwnProperty("_id"), "The _id field is not present");
+        assert(nsDoc.hasOwnProperty("key"), "The key field is not present");
         
         var count = db.getSiblingDB("config").chunks.count({ ns: nsDoc._id });
         assert.lt(0, count, "The number of chunks to process is less than 1");
@@ -116,14 +117,15 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var checkChunkSize = function(chunk) {
         var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
-        assert(res.size, "The size field is not present it the response");
+        assert(res.hasOwnProperty("size"), "The size field is not present it the response");
         var chunkSize = res.size;
 
         if (chunkSize >= SPLIT_THRESHOLD) {
             if( (OPTIMIZE_CHUNK_SIZE_CALCULATION == true) && (DOUBLECHECK_CHUNK_SIZE == true) ) {
                 chunk.estimate = false;
                 var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(chunk);
-                assert(res.size, "The size field is not present it the response");
+                assert(res.hasOwnProperty("size"), "The size field is not present in the response");
+
                 if (chunkSize > SPLIT_THRESHOLD) {
                     var chunkSize = res.size;
                 }
@@ -146,7 +148,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         };
 
         var res = CON_MAP.get(chunk.shard).getDB("admin").runCommand(arguments);
-        assert(res.splitKeys, "The splitKey field is not present");
+        assert(res.hasOwnProperty("splitKeys"), "The splitKey field is not present");
 
         if (res.splitKeys.length > 0) {
             chunk.canSplit = true;
@@ -158,9 +160,9 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getShardVersion = function(namespace) {
         var res = db.getSiblingDB("admin").runCommand({getShardVersion: namespace});
-        assert(res.ok, "The ok field is not present");
-        assert(res.version, "The version field is not present");
-        assert(res.versionEpoch, "The versionEpoch field is not present");
+        assert(res.hasOwnProperty("ok"), "The ok field is not present");
+        assert(res.hasOwnProperty("version"), "The version field is not present");
+        assert(res.hasOwnProperty("versionEpoch"), "The versionEpoch field is not present");
         assert.eq(1, res.ok, "Failed to obtain the shard version");
 
         return [ res.version, res.versionEpoch ];
@@ -181,7 +183,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         };
   
         var res = shardConnection.getDB("admin").runCommand(args);
-        assert(res.ok, "The ok field is not present");
+        assert(res.hasOwnProperty("ok"), "The ok field is not present");
 
         if(res.ok != 1){
             print("\nERROR: Chunk split failed");
@@ -205,7 +207,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getChunkCounts = function(chunkArray) {
         assert.lt(0, chunkArray.length, "no chunks found" );
-        assert(chunkArray[0].datasize, "datasize field is not present");
+        assert(chunkArray[0].hasOwnProperty("datasize"), "datasize field is not present");
         print("Found " + chunkArray.length + " chunks for " + chunkArray[0].datasize + " collection\n");
 
         return chunkArray.length;
