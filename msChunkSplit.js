@@ -54,6 +54,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     var getChunkSize = function() {
         if(db.getSiblingDB("config").settings.count({_id: "chunksize"}) != 0){
             var res = db.getSiblingDB("config").settings.findOne({_id: "chunksize"}, {_id:0, value:1});
+            assert(res, "The chunksize document could not be retrieved");
             assert(res.hasOwnProperty("value"), "value field is not present");
             assert.lte(0, res.value, "maximum chunksize value is less than or equal to 0");
             return res.value * 1024 * 1024; 
@@ -64,9 +65,10 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     // Get the CSRS connection string
 
     var getCsrsUri = function() {
-        var res = db.serverStatus()
+        var res = db.serverStatus();
+        assert(res, "serverStatus failed");
         assert(res.hasOwnProperty("sharding"), "The sharding field is not present");
-        assert(res.sharding("configsvrConnectionString"), "The sharding.configsvrConnectionString field is not present");
+        assert(res.sharding.hasOwnProperty("configsvrConnectionString"), "The sharding.configsvrConnectionString field is not present");
         return res.sharding.configsvrConnectionString;
     };
 
@@ -91,6 +93,8 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
         var nsDoc = db.getSiblingDB("config").collections.findOne({_id: namespace}, {_id:1, key:1});
+        printjson(nsDoc);
+        assert(nsDoc, "Namespace not found");
         assert(nsDoc.hasOwnProperty("_id"), "The _id field is not present");
         assert(nsDoc.hasOwnProperty("key"), "The key field is not present");
         
@@ -160,6 +164,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getShardVersion = function(namespace) {
         var res = db.getSiblingDB("admin").runCommand({getShardVersion: namespace});
+        assert(res, "The getShardVersion command failed");
         assert(res.hasOwnProperty("ok"), "The ok field is not present");
         assert(res.hasOwnProperty("version"), "The version field is not present");
         assert(res.hasOwnProperty("versionEpoch"), "The versionEpoch field is not present");
