@@ -93,7 +93,6 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     var getDatasizeArgs = function(namespace, percentage=SAMPLE) {
         var nsDoc = db.getSiblingDB("config").collections.findOne({_id: namespace}, {_id:1, key:1});
-        printjson(nsDoc);
         assert(nsDoc, "Namespace not found");
         assert(nsDoc.hasOwnProperty("_id"), "The _id field is not present");
         assert(nsDoc.hasOwnProperty("key"), "The key field is not present");
