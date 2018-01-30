@@ -23,13 +23,15 @@
 // Prerquisites:
 //   - it is expected that there are no writes happenning to the target namespace when the script is executed
 //   - the Balancer should be stopped and disabled
-//   - if authentication is enabled, the user running the script must have `internal` action granted for the `cluster` resource on the shards
+//   - if authentication is enabled, the user running the script must have `internal` action granted for the `cluster` 
+//     resource on the shards
 //      db.createRole({role:"splitchunk", privileges:[{resource:{cluster:true}, actions:["internal"]}], roles:[]});
 //      db.grantRolesToUser("admin", ["splitchunk"]);
 //   - tested with `root` & `splitchunk` roles thus `root` role is recommended
-//   - the script tested on v3.4 _only_. Use it with MongoDB v3.6 on your own risk
+//   - the script was tested on v3.4 _only_. Use it with MongoDB v3.6 on your own risk
 //
 // Sample usage:
+//   splitCollectionChunks("test.s2");
 //   splitCollectionChunks("test.s3", false);
 //   splitCollectionChunks("test.s5", true);
 
@@ -58,7 +60,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
             assert(res.hasOwnProperty("value"), "value field is not present");
             assert.lte(0, res.value, "maximum chunksize value is less than or equal to 0");
             return res.value * 1024 * 1024; 
-        }
+        };
         return 64 * 1024 * 1024;
     };
     
