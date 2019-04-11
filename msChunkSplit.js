@@ -318,6 +318,10 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
             i++;
         });
 
+	if ( i > 0 ) {
+	    printProgress(couldSplitCount, i, pos);
+        };
+
         var canSplitCount = getSplitChunkCounts(CHUNKS_TO_SPLIT);
         if(canSplitCount == 0) {
             print("There are no chunks to split. Aborting ...");
@@ -338,6 +342,10 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
                     pos = printProgress(canSplitCount, i, pos);
                     i++;
                 });
+
+	        if ( i > 0 ) {
+	            printProgress(couldSplitCount, i, pos);
+                };
 
                 // Step 5: Let's validate the splits outcome
 
