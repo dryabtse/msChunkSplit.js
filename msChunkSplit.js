@@ -184,7 +184,7 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
             "max": chunk.max,
             "keyPattern": chunk.keyPattern,
             "splitKeys": splitVector,
-            "configdb": configDB,
+            "configdb": configDB,  // Only needed for v3.4 and below
             "shardVersion": shardVersion
         };
   
