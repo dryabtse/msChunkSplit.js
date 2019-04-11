@@ -300,6 +300,10 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         pos = printProgress(CHUNKS.length, i, pos);
         i++;
     });
+
+    if ( i > 0 ) {
+        printProgress(couldSplitCount, i, pos);
+    };
     
     var couldSplitCount = getCouldSplitChunkCounts(CHUNKS_TO_SPLIT);
     if(couldSplitCount == 0) {
