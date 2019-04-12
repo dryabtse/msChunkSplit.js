@@ -271,16 +271,6 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     // A few small helpers
 
-    var getDbFromNs = function(namespace) {
-        return namespace.split(".")[0];
-    };
-
-    var getColFromNs = function(namespace) {
-        var arr = namespace.split(".");
-        arr.shift();
-        return arr.join(".");
-    };
-
     var getChunkCounts = function(chunkArray) {
         assert.lt(0, chunkArray.length, "no chunks found" );
         assert(chunkArray[0].hasOwnProperty("datasize"), "datasize field is not present");
