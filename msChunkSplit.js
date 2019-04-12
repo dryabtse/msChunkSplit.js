@@ -51,6 +51,72 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
     
     // Configurable globals end here
 
+    // Checks if authentication is enabled for the cluster
+
+    var checkAuthEnabled = function() {
+        var authEnabled = null;
+        var res = db.adminCommand({'getParameter': 1, 'clusterAuthMode': 1});
+        assert(res, "The getParameter command could not be run");
+        assert(res.hasOwnProperty("ok"), "The ok field is not present");
+        assert.eq(1, res.ok, "Failed to check if clusterAuthMode is set");
+        
+        if(res.hasOwnProperty("clusterAuthMode")) {
+            if(res.clusterAuthMode.localeCompare("keyFile") == 0 || res.clusterAuthMode.localeCompare("sendKeyFile") == 0 || res.clusterAuthMode.localeCompare("sendX509") == 0 || res.clusterAuthMode.localeCompare("x509") == 0) {
+                authEnabled = true;
+            } else if (res.clusterAuthMode.localeCompare("undefined") == 0) {
+                authEnabled = false;
+            };
+        };
+        
+        return authEnabled;
+    };
+
+    // Obtains the list of privileges for the existing connection
+
+    var getPrivileges = function(connection) {
+        var res = connection.getDB("admin").runCommand({connectionStatus: 1, showPrivileges: true});
+        assert(res, "The connectionStatus command could not be run");
+        assert(res.hasOwnProperty("ok"), "The ok field is not present");
+        assert(res.hasOwnProperty("authInfo"), "authInfo field is not present");
+        assert(res.authInfo.hasOwnProperty("authenticatedUserPrivileges"), "authenticatedUserPrivileges field is not present");
+        assert.eq(1, res.ok, "Failed to obtain privileges for the authenticated user");
+        return res.authInfo.authenticatedUserPrivileges;
+    };
+
+    // Checks if the list of actions contains 'internal'
+
+    var checkActionInternal = function(actions) {
+        assert(Array.isArray(actions), "The provided argument is not an array");
+        var internalFound = false;
+        actions.forEach(function(a) {
+            if(a.localeCompare("internal") == 0) {
+                internalFound = true;
+            };
+        });
+        return internalFound;
+    };
+
+    // Checks if the list of privileges contains 'internal' action for `cluster` resource
+
+    var checkPrivInternalAction = function(privileges) {
+        assert(Array.isArray(privileges), "The provided argument is not an array");
+        var hasInternal = false;
+        privileges.forEach(function(p) {
+            if(p.hasOwnProperty("resource")) {
+                if(p.resource.hasOwnProperty("cluster")) {
+                    if(p.resource.cluster == true) {
+                        if(p.hasOwnProperty("actions")) {
+                            if(checkActionInternal(p.actions) == true) {
+                                hasInternal = true;
+                            };
+                        };
+                    };
+                };
+            };
+        });
+        return hasInternal;
+    };
+
     // Get the maxumum chunk size configured for the cluster
 
     var getChunkSize = function() {
@@ -82,8 +148,12 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
     db.getSiblingDB("config").shards.find({}).forEach(function(d) {
         var con = new Mongo(d.host);
-        var res = con.getDB(AUTH_DB).auth(AUTH_CRED);
-        assert.eq(1, res, "Authentication failed");
+        // Let's check if authentication is enabled. No need to authenticate if it's off
+        var isAuthEnabled = checkAuthEnabled();
+        if(isAuthEnabled != false) {
+            var res = con.getDB(AUTH_DB).auth(AUTH_CRED);
+            assert.eq(1, res, "Authentication failed");
+        };
         CON_MAP.put(d._id, con);
     });
 
@@ -274,6 +344,21 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
         
         return lastPosPrinted;
       };
+    
+    // Runs the check on each connection in CON_MAP to see if internal action is present
+
+    var isAuthorizedToSplit = function() {
+        var isAllConnectionsAuthorized = true;
+        var priv = null;
+        CON_MAP.values().forEach(function(con) {
+            priv = getPrivileges(con)
+            if(checkPrivInternalAction(priv) == false) {
+                isAllConnectionsAuthorized = false;
+            };
+        });
+        
+        return isAllConnectionsAuthorized;
+    };
 
     /// MAIN SECTION
 
@@ -336,28 +421,35 @@ var splitCollectionChunks = function(NS, DO_SPLIT=false) {
 
             if (DO_SPLIT == true) {
                 print("Step 4: Splitting the qualifying chunks...");
-                var pos = 0;
-                var i = 0;
-                CHUNKS_TO_SPLIT.forEach(function(c) {
-                    if(c.canSplit == true) {
-                        var shardVersion = getShardVersion(c.datasize);
-                        splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
+
+                // No point in trying to split if we don't have the necessary privilege
+                if(isAuthorizedToSplit() == false) {
+                    print("Splits were requested, but `internal` action is not granted. Skipping...")
+                } else {
+                    var pos = 0;
+                    var i = 0;
+                    CHUNKS_TO_SPLIT.forEach(function(c) {
+                        if(c.canSplit == true) {
+                            var shardVersion = getShardVersion(c.datasize);
+                            splitChunk(c, CON_MAP.get(c.shard), c.splitVector, shardVersion, CONFIGSVR);
+                        };
+                        pos = printProgress(canSplitCount, i, pos);
+                        i++;
+                    });
+    
+                    if ( i > 0 ) {
+                        printProgress(couldSplitCount, i, pos);
                     };
-                    pos = printProgress(canSplitCount, i, pos);
-                    i++;
-                });
+        
+                    // Step 5: Let's validate the splits outcome
+    
+                    print("\nStep 5: Checking if the number of chunks has changed...");
+                    CHUNKS = [];
+                    getDatasizeArgs(NS);
+                    var nowChunks = getChunkCounts(CHUNKS);
+                    print("There were " + (nowChunks - wasChunks) + " chunks added");
 
-	        if ( i > 0 ) {
-	            printProgress(couldSplitCount, i, pos);
                 };
-
-                // Step 5: Let's validate the splits outcome
-
-                print("\nStep 5: Checking if the number of chunks has changed...");
-                CHUNKS = [];
-                getDatasizeArgs(NS);
-                var nowChunks = getChunkCounts(CHUNKS);
-                print("There were " + (nowChunks - wasChunks) + " chunks added");
             }
             else {
                 print("Splits were not requested. Exiting...");
